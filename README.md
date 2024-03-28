@@ -1,4 +1,4 @@
-[![Tests](https://github.com/xiangguand/c_cxx_template/actions/workflows/test.yaml/badge.svg)](https://github.com/xiangguand/c_cxx_template/actions/workflows/test.yaml)
+[![Tests](https://github.com/xiangguand/fdt-reader/actions/workflows/test.yaml/badge.svg)](https://github.com/xiangguand/fdt-reader/actions/workflows/test.yaml)
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
