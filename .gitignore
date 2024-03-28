@@ -45,3 +45,8 @@ _deps
 
 build
 
+.vscode
+
+*.dtb
+!patterns/error_magic.dtb
+
