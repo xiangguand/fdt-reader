@@ -9,6 +9,8 @@
 #include <vector>
 #include <iomanip>
 
+#define DEBUG 1
+
 #define FDT_MAGIC (0xEDFE0DD0U)
 
 /* FDT Header, copy from spec */
