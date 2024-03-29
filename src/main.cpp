@@ -9,27 +9,20 @@
 #include <vector>
 #include <iomanip>
 
+typedef uint32_t fdt32_t;
+typedef uint64_t fdt64_t;
+
+#include "fdt.h"
+
 #define DEBUG 1
 
-#define FDT_MAGIC (0xEDFE0DD0U)
-
-/* FDT Header, copy from spec */
-struct fdt_header {
-  uint32_t magic;
-  uint32_t totalsize;
-  uint32_t off_dt_struct;
-  uint32_t off_dt_strings;
-  uint32_t off_mem_rsvmap;
-  uint32_t version;
-  uint32_t last_comp_version;
-  uint32_t boot_cpuid_phys;
-  uint32_t size_dt_strings;
-  uint32_t size_dt_struct;
-};
+#define ENDIAN_CHANGE32(x)   ((((((x & 0xFF00FF00U) >> 8U) | ((x & 0x00FF00FF) << 8U)) & 0xFFFF0000U) >> 16U) | (((((x & 0xFF00FF00U) >> 8U) | ((x & 0x00FF00FF) << 8U)) & 0x0000FFFFU) << 16U))
 
 using namespace std;
 
-#if DEBUG
+void hexdump(uint8_t *buf, int sz);
+void printString(void *buf);
+
 void hexdump(uint8_t *buf, int sz) {
   int i;
   for(i=0;i<sz;i++) {
@@ -42,7 +35,17 @@ void hexdump(uint8_t *buf, int sz) {
     cout << endl;
   }
 }
-#endif /* DEBUG */
+
+
+void printString(void *buf) {
+  struct fdt_header *hd = (struct fdt_header *)buf;
+  ENDIAN_CHANGE32(hd->size_dt_struct);
+  string s = "";
+  for(size_t i=ENDIAN_CHANGE32(hd->off_dt_strings);i<ENDIAN_CHANGE32(hd->off_dt_strings)+ENDIAN_CHANGE32(hd->size_dt_strings);i++) {
+    s += ((char *)buf)[i];
+  }
+  cout << s << endl;
+}
 
 int main(int argc, char *argv[]) {
   (void)argc;
@@ -86,26 +89,67 @@ int main(int argc, char *argv[]) {
   struct fdt_header *hd = (struct fdt_header *)bin;
 
   cout << hex;
-  cout << "magic: " << hd->magic << endl;
+  cout << "magic: " << ENDIAN_CHANGE32(hd->magic) << endl;
   cout << dec;
-  cout << "totalsize: " << hd->totalsize << "d" << endl;
+  cout << "totalsize: " << ENDIAN_CHANGE32(hd->totalsize) << "d" << endl;
   cout << hex;
-  cout << "off_dt_struct: " << hd->off_dt_struct << endl;
-  cout << "off_dt_strings: " << hd->off_dt_strings << endl;
-  cout << "off_mem_rsvmap: " << hd->off_mem_rsvmap << endl;
-  cout << "version: " << hd->version << endl;
-  cout << "last_comp_version: " << hd->last_comp_version << endl;
-  cout << "boot_cpuid_phys: " << hd->boot_cpuid_phys << endl;
+  cout << "off_dt_struct: " << ENDIAN_CHANGE32(hd->off_dt_struct) << endl;
+  cout << "off_dt_strings: " << ENDIAN_CHANGE32(hd->off_dt_strings) << endl;
+  cout << "off_mem_rsvmap: " << ENDIAN_CHANGE32(hd->off_mem_rsvmap) << endl;
+  cout << "version: " << ENDIAN_CHANGE32(hd->version) << endl;
+  cout << "last_comp_version: " << ENDIAN_CHANGE32(hd->last_comp_version) << endl;
+  cout << "boot_cpuid_phys: " << ENDIAN_CHANGE32(hd->boot_cpuid_phys) << endl;
   cout << dec;
-  cout << "size_dt_strings: " <<  hd->size_dt_strings << "d" << endl;
-  cout << "size_dt_struct: " << hd->size_dt_struct << "d" << endl;
+  cout << "size_dt_strings: " <<  ENDIAN_CHANGE32(hd->size_dt_strings) << "d" << endl;
+  cout << "size_dt_struct: " << ENDIAN_CHANGE32(hd->size_dt_struct) << "d" << endl;
 
+  cout << "fdt header size is " << sizeof(struct fdt_header) << endl;
+  hexdump(&bin[sizeof(struct fdt_header)], file_stat.st_size - sizeof(struct fdt_header));
 
-  if(FDT_MAGIC != hd->magic) {
+  if(FDT_MAGIC != ENDIAN_CHANGE32(hd->magic)) {
     cerr << "Invalid magic code" << endl;
     return -1;
   }
 
+
+  printString((void *)bin);
+
+  /* Start parsing dtb file */
+  uint32_t i = ENDIAN_CHANGE32(hd->off_dt_struct);
+  cout << dec;
+  while(i < (ENDIAN_CHANGE32(hd->size_dt_struct) + ENDIAN_CHANGE32(hd->off_dt_struct))) {
+    uint32_t code = ENDIAN_CHANGE32(*((uint32_t *)(&bin[i])));
+    if(code == FDT_BEGIN_NODE) {
+      cout << endl << "===== BEGIN NODE =====" << endl;
+      i += 4;
+    }
+    else if(code == FDT_END_NODE) {
+      cout << endl << "===== END NODE =====" << endl;
+      i += 4;
+    }
+    else if(code == FDT_END) {
+      cout << endl << "===== END =====" << endl;
+      i += 4;
+    }
+    else if(code == FDT_PROP) {
+      cout << endl << "===== PROP =====" << endl;
+      cout << "length is " << hex << ENDIAN_CHANGE32(*((uint32_t *)(&bin[i+4]))) << endl;
+      i += sizeof(struct fdt_property);
+    }
+    else if(code == FDT_NOP || 0 == code) {
+      cout << endl << "===== NOP =====" << endl;
+      i += 4;
+    }
+    else if(bin[i] >= 0x20) {
+      cout << bin[i];
+      i++;
+    }
+    else {
+      cerr << "#";
+      i++;
+    }
+  }
+  cout << endl;
 
   delete[] bin;
 
