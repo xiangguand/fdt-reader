@@ -3,11 +3,14 @@
 * This program is to read .dtb file.
 */
 
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <sys/stat.h>
 #include <vector>
 #include <iomanip>
+
+using namespace std;
 
 typedef uint32_t fdt32_t;
 typedef uint64_t fdt64_t;
@@ -18,7 +21,93 @@ typedef uint64_t fdt64_t;
 
 #define ENDIAN_CHANGE32(x)   ((((((x & 0xFF00FF00U) >> 8U) | ((x & 0x00FF00FF) << 8U)) & 0xFFFF0000U) >> 16U) | (((((x & 0xFF00FF00U) >> 8U) | ((x & 0x00FF00FF) << 8U)) & 0x0000FFFFU) << 16U))
 
-using namespace std;
+
+class Node {
+public:
+  Node(const string &key, const string &val) : key_(key), val_(val) {}
+  Node(const string &key, const vector<string> &val_list) : key_(key), val_list_(val_list) {}
+  ~Node () {
+
+  }
+  Node *next;
+  Node *prev;
+private:
+  string key_;
+  string val_;
+  vector<string> val_list_;
+};
+
+class Fdt {
+public:
+  Fdt() {
+  }
+  ~Fdt() {
+
+  }
+  void parse(uint8_t *bin, uint32_t sz) {
+    memcpy(&hd_, bin, sizeof(struct fdt_header));
+    magic = ENDIAN_CHANGE32(hd_.magic);
+    totalsize = ENDIAN_CHANGE32(hd_.totalsize);
+    dt_struct_off = ENDIAN_CHANGE32(hd_.off_dt_struct);
+    dt_strings_off = ENDIAN_CHANGE32(hd_.off_dt_strings);
+    mem_rvsmap_off = ENDIAN_CHANGE32(hd_.off_mem_rsvmap);
+    version = ENDIAN_CHANGE32(hd_.version);
+    last_comp_version = ENDIAN_CHANGE32(hd_.last_comp_version);
+    cpuid_phys = ENDIAN_CHANGE32(hd_.boot_cpuid_phys);
+    dt_strings_sz = ENDIAN_CHANGE32(hd_.size_dt_strings);
+    dt_struct_sz = ENDIAN_CHANGE32(hd_.size_dt_struct);
+
+    name_string = "";
+    for(int i=0;i<dt_strings_sz;i++) {
+      name_string += bin[dt_strings_off + i];
+    }
+
+    int i = dt_struct_off;
+    while(i < (dt_struct_off+dt_struct_sz)) {
+      uint32_t code = *((uint32_t *)&bin[i]);
+      if(FDT_BEGIN_NODE == code) {
+        
+        i += 4;
+      }
+      else if(FDT_END_NODE == code) {
+        i += 4;
+      }
+      else if(FDT_END == code) {
+        i += 4; 
+      }
+      else if(FDT_PROP == code) {
+        i += 12;
+      }
+      else {
+        // bypassing
+        i++;
+      }
+    }
+  }
+  void print_header() {
+  }
+  void print_string() {
+    cout << name_string << endl;
+  }
+  void print_node_info() {
+
+  }
+  uint32_t magic;
+  uint32_t totalsize;
+  uint32_t dt_struct_off;
+  uint32_t dt_strings_off;
+  uint32_t mem_rvsmap_off;
+  uint32_t version;
+  uint32_t last_comp_version;
+  uint32_t cpuid_phys;
+  uint32_t dt_strings_sz;
+  uint32_t dt_struct_sz;
+
+private:
+  struct fdt_header hd_;
+  vector<Node *>roots;
+  string name_string;
+};
 
 void hexdump(uint8_t *buf, int sz);
 void printString(void *buf);
@@ -35,7 +124,6 @@ void hexdump(uint8_t *buf, int sz) {
     cout << endl;
   }
 }
-
 
 void printString(void *buf) {
   struct fdt_header *hd = (struct fdt_header *)buf;
@@ -114,6 +202,7 @@ int main(int argc, char *argv[]) {
 
   printString((void *)bin);
 
+
   /* Start parsing dtb file */
   uint32_t i = ENDIAN_CHANGE32(hd->off_dt_struct);
   cout << dec;
@@ -133,7 +222,8 @@ int main(int argc, char *argv[]) {
     }
     else if(code == FDT_PROP) {
       cout << endl << "===== PROP =====" << endl;
-      cout << "length is " << hex << ENDIAN_CHANGE32(*((uint32_t *)(&bin[i+4]))) << endl;
+      cout << "length is 0x" << hex << ENDIAN_CHANGE32(*((uint32_t *)(&bin[i+4]))) << endl;
+      cout << "string offset is 0x" << hex << ENDIAN_CHANGE32(*((uint32_t *)(&bin[i+8]))) << endl;
       i += sizeof(struct fdt_property);
     }
     else if(code == FDT_NOP || 0 == code) {
@@ -150,6 +240,13 @@ int main(int argc, char *argv[]) {
     }
   }
   cout << endl;
+
+
+  Fdt fdt;
+  fdt.parse(bin, file_stat.st_size);
+  fdt.print_header();
+  fdt.print_string();
+  fdt.print_node_info();
 
   delete[] bin;
 
