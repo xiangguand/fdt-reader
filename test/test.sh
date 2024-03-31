@@ -7,6 +7,7 @@ dut=./build/fdt_reader
 echo "Buiild input device tree"
 dtc -I dts -O dtb -o patterns/dt00.dtb patterns/dt00.dts
 dtc -I dts -O dtb -o patterns/dt01.dtb patterns/dt01.dts
+dtc -I dts -O dtb -o patterns/dt02.dtb patterns/dt02.dts
 
 $dut
 if [ $? -eq 0 ]; then
@@ -19,6 +20,11 @@ if [ $? -ne 0 ]; then
 fi
 
 $dut patterns/dt01.dtb
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+$dut patterns/dt02.dtb
 if [ $? -ne 0 ]; then
   exit 1
 fi
